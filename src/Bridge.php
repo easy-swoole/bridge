@@ -92,8 +92,9 @@ class Bridge
     /**
      * @param mixed $socketFile
      */
-    public function setSocketFile($socketFile): void
+    public function setSocketFile($socketFile): Bridge
     {
         $this->socketFile = $socketFile;
+        return $this;
     }
 }
