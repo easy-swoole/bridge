@@ -55,7 +55,7 @@ class Bridge
         $server->addProcess($p->getProcess());
     }
 
-    function send(Package $package, $timeout = 3.0): Package
+    function send(Package $package,float $timeout = 3.0): Package
     {
         $client = new Client($this->getSocketFile());
         $client->send(serialize($package));
@@ -68,6 +68,14 @@ class Bridge
             $package->setStatus(Package::STATUS_UNIX_CONNECT_ERROR);
         }
         return $package;
+    }
+
+    function call(string $command,$arg = null,float $timeout = 3.0):Package
+    {
+        $package = new Package();
+        $package->setCommand($command);
+        $package->setArgs($arg);
+        return $this->send($package,$timeout);
     }
 
     /**
