@@ -84,7 +84,7 @@ class Bridge
     public function getSocketFile()
     {
         if(empty($this->socketFile)){
-            $this->socketFile = EASYSWOOLE_TEMP_DIR.'/bridge.sock';
+            $this->socketFile = sys_get_temp_dir().'/bridge.sock';
         }
         return $this->socketFile;
     }
