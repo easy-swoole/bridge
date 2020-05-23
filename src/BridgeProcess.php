@@ -42,7 +42,7 @@ class BridgeProcess extends AbstractUnixProcess
         if (!$callback) {
             $package = new Package();
             $package->setStatus(Package::STATUS_COMMAND_NOT_EXIST);
-            $package->setArgs("command:{$package->getCommand()} is not exist");
+            $package->setMsg("command:{$package->getCommand()} is not exist");
             Protocol::socketWriter($socket, serialize($package));
             $socket->close();
             return null;
@@ -54,7 +54,7 @@ class BridgeProcess extends AbstractUnixProcess
             call_user_func($callback,$package,$responsePackage,$socket);
         }catch (\Throwable $throwable){
             $responsePackage->setStatus(Package::STATUS_COMMAND_ERROR);
-            $responsePackage->setArgs($throwable->getMessage());
+            $responsePackage->setMsg($throwable->getMessage());
             $this->onException($throwable);
         } finally {
             Protocol::socketWriter($socket,serialize($responsePackage));

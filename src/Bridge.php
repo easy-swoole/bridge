@@ -5,6 +5,7 @@ namespace EasySwoole\Bridge;
 
 
 use EasySwoole\Component\Process\Socket\UnixProcessConfig;
+use EasySwoole\Socket\Tools\Client;
 use Swoole\Server;
 
 class Bridge
@@ -54,7 +55,20 @@ class Bridge
         $server->addProcess($p->getProcess());
     }
 
-
+    function send(Package $package, $timeout = 3.0): Package
+    {
+        $client = new Client($this->getSocketFile());
+        $client->send(serialize($package));
+        $ret = $client->recv($timeout);
+        $client->close();
+        $package = unserialize($ret);
+        if(!$package instanceof Package){
+            $package = new Package();
+            $package->setMsg('connect to server fail');
+            $package->setStatus(Package::STATUS_UNIX_CONNECT_ERROR);
+        }
+        return $package;
+    }
 
     /**
      * @return mixed

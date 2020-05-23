@@ -9,6 +9,7 @@ class Package
     protected $status = self::STATUS_SUCCESS;
     protected $command;
     protected $args;
+    protected $msg;
 
     const STATUS_UNIX_CONNECT_ERROR = -1;
     const STATUS_PACKAGE_ERROR = -2;
@@ -63,5 +64,21 @@ class Package
     public function setArgs($args): void
     {
         $this->args = $args;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getMsg()
+    {
+        return $this->msg;
+    }
+
+    /**
+     * @param mixed $msg
+     */
+    public function setMsg($msg): void
+    {
+        $this->msg = $msg;
     }
 }
