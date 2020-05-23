@@ -38,8 +38,11 @@ class BridgeProcess extends AbstractUnixProcess
          * @var $package Package
          */
         $package = unserialize($data);
-        $callback = $this->container->get($package->getCommand());
-        if (!$callback) {
+        /**
+         * @var $command CommandInterface
+         */
+        $command = $this->container->get($package->getCommand());
+        if (!$command instanceof CommandInterface) {
             $package = new Package();
             $package->setStatus(Package::STATUS_COMMAND_NOT_EXIST);
             $package->setMsg("command:{$package->getCommand()} is not exist");
@@ -51,7 +54,7 @@ class BridgeProcess extends AbstractUnixProcess
         try{
             //结果在闭包中更改
             $responsePackage->setStatus(Package::STATUS_SUCCESS);
-            call_user_func($callback,$package,$responsePackage,$socket);
+            $command->exec($package,$responsePackage,$socket);
         }catch (\Throwable $throwable){
             $responsePackage->setStatus(Package::STATUS_COMMAND_ERROR);
             $responsePackage->setMsg($throwable->getMessage());
