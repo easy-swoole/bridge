@@ -14,6 +14,8 @@ class Bridge
     private $container;
     private $onStart;
     private $onException;
+    private $serverName;
+    private $hasAttach = false;
 
     function __construct(Container $container = null)
     {
@@ -42,8 +44,13 @@ class Bridge
 
     function attachServer(Server $server,string $serverName = 'EasySwoole')
     {
+        if($this->hasAttach){
+            return;
+        }
+        $this->hasAttach = true;
+        $this->serverName = $serverName;
         $config = new UnixProcessConfig();
-        $config->setSocketFile($this->socketFile);
+        $config->setSocketFile($this->getSocketFile());
         $config->setProcessName("{$serverName}.Bridge");
         $config->setProcessGroup("{$serverName}.Bridge");
         $config->setArg([
@@ -84,7 +91,7 @@ class Bridge
     public function getSocketFile()
     {
         if(empty($this->socketFile)){
-            $this->socketFile = sys_get_temp_dir().'/bridge.sock';
+            $this->socketFile = sys_get_temp_dir()."/{$this->serverName}.bridge.sock";
         }
         return $this->socketFile;
     }
