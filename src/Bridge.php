@@ -68,7 +68,12 @@ class Bridge
         $client->send(serialize($package));
         $ret = $client->recv($timeout);
         $client->close();
-        $package = unserialize($ret);
+        if(!empty($ret)){
+            $package = unserialize($ret);
+        }else{
+            $package = null;
+        }
+
         if(!$package instanceof Package){
             $package = new Package();
             $package->setMsg('connect to server fail');
