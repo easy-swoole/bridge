@@ -17,7 +17,7 @@ class Bridge
     private $serverName;
     private $hasAttach = false;
 
-    function __construct(Container $container = null)
+    function __construct(Container|null $container = null)
     {
         if(!$container){
             $container = new Container();
