@@ -12,7 +12,7 @@ class Bridge
 {
     private string $socketFile;
     private Container $container;
-    private mixed $onException;
+    private mixed $onException = null;
     private string $serverName;
     private bool $hasAttach = false;
 
