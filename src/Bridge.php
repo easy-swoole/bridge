@@ -10,12 +10,11 @@ use Swoole\Server;
 
 class Bridge
 {
-    private $socketFile;
-    private $container;
-    private $onStart;
-    private $onException;
-    private $serverName;
-    private $hasAttach = false;
+    private string $socketFile;
+    private Container $container;
+    private mixed $onException;
+    private string $serverName;
+    private bool $hasAttach = false;
 
     function __construct(Container|null $container = null)
     {
@@ -25,11 +24,6 @@ class Bridge
         $this->container = $container;
     }
 
-    function setOnStart(callable $call): Bridge
-    {
-        $this->onStart = $call;
-        return $this;
-    }
 
     function setOnException(callable $call): Bridge
     {
@@ -42,7 +36,7 @@ class Bridge
         return $this->container;
     }
 
-    function attachServer(Server $server,string $serverName = 'EasySwoole')
+    function attachServer(Server $server,string $serverName = 'EasySwoole'): void
     {
         if($this->hasAttach){
             return;
@@ -54,7 +48,6 @@ class Bridge
         $config->setProcessName("{$serverName}.Bridge");
         $config->setProcessGroup("{$serverName}.Bridge");
         $config->setArg([
-            'onStart'=>$this->onStart,
             'container'=>$this->container,
             'onException'=>$this->onException
         ]);
@@ -65,9 +58,17 @@ class Bridge
     function send(Package $package,float $timeout = 3.0): Package
     {
         $client = new Client($this->getSocketFile());
+        if(!$client->client()->isConnected()){
+            $package = new Package();
+            $package->setMsg('connect to server fail');
+            $package->setStatus(StatusEnum::CONNECT_ERROR);
+            return $package;
+        }
+
         $client->send(serialize($package));
         $ret = $client->recv($timeout);
         $client->close();
+
         if(!empty($ret)){
             $package = unserialize($ret);
         }else{
@@ -76,8 +77,8 @@ class Bridge
 
         if(!$package instanceof Package){
             $package = new Package();
-            $package->setMsg('connect to server fail');
-            $package->setStatus(Package::STATUS_UNIX_CONNECT_ERROR);
+            $package->setMsg('receive package from server error');
+            $package->setStatus(StatusEnum::PACKAGE_ERROR);
         }
         return $package;
     }
@@ -90,10 +91,8 @@ class Bridge
         return $this->send($package,$timeout);
     }
 
-    /**
-     * @return mixed
-     */
-    public function getSocketFile()
+
+    protected function getSocketFile():string
     {
         if(empty($this->socketFile)){
             $this->socketFile = sys_get_temp_dir()."/{$this->serverName}.bridge.sock";
@@ -101,10 +100,8 @@ class Bridge
         return $this->socketFile;
     }
 
-    /**
-     * @param mixed $socketFile
-     */
-    public function setSocketFile($socketFile): Bridge
+
+    public function setSocketFile(string $socketFile): Bridge
     {
         $this->socketFile = $socketFile;
         return $this;

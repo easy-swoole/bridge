@@ -10,17 +10,13 @@ use Swoole\Coroutine\Socket;
 
 class BridgeProcess extends AbstractUnixProcess
 {
-    private $container;
-    private $onException;
+    private Container $container;
+    private mixed $onException;
 
     function run($arg)
     {
         $this->container = $arg['container'];
         $this->onException = $arg['onException'];
-        $onStart = $arg['onStart'];
-        if($onStart){
-            call_user_func($onStart,$this);
-        }
         parent::run($arg);
     }
 
@@ -28,35 +24,35 @@ class BridgeProcess extends AbstractUnixProcess
     {
         $data = Protocol::socketReader($socket, 3);
         if ($data === null) {
-            $package = new  Package();
-            $package->setStatus(Package::STATUS_PACKAGE_ERROR);
-            Protocol::socketWriter($socket, serialize($package));
+            $responsePackage = new Package();
+            $responsePackage->setStatus(StatusEnum::PACKAGE_ERROR);
+            $responsePackage->setMsg('receive package from client error');
+            Protocol::socketWriter($socket, serialize($responsePackage));
             $socket->close();
             return null;
         }
         /**
-         * @var $package Package
+         * @var $request Package
          */
-        $package = unserialize($data);
-        /**
-         * @var $command CommandInterface
-         */
-        $command = $this->container->get($package->getCommand());
+        $request = unserialize($data);
+
+        $command = $this->container->get($request->getCommand());
         if (!$command instanceof CommandInterface) {
-            $package = new Package();
-            $package->setStatus(Package::STATUS_COMMAND_NOT_EXIST);
-            $package->setMsg("command:{$package->getCommand()} is not exist");
-            Protocol::socketWriter($socket, serialize($package));
+            $responsePackage = new Package();
+            $responsePackage->setStatus(StatusEnum::COMMAND_NOT_EXIST);
+            $responsePackage->setMsg("command {$request->getCommand()} not exist");
+            Protocol::socketWriter($socket, serialize($responsePackage));
             $socket->close();
             return null;
         }
         $responsePackage = new Package();
         try{
             //结果在闭包中更改
-            $responsePackage->setStatus(Package::STATUS_SUCCESS);
-            $command->exec($package,$responsePackage,$socket);
+            $responsePackage->setStatus(StatusEnum::SUCCESS);
+            $request->setClientSocket($socket);
+            $command->exec($request,$responsePackage);
         }catch (\Throwable $throwable){
-            $responsePackage->setStatus(Package::STATUS_COMMAND_ERROR);
+            $responsePackage->setStatus(StatusEnum::COMMAND_EXEC_ERROR);
             $responsePackage->setMsg($throwable->getMessage());
             $this->onException($throwable);
         } finally {

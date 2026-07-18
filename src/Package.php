@@ -4,81 +4,70 @@
 namespace EasySwoole\Bridge;
 
 
+use Swoole\Coroutine\Socket;
+
 class Package
 {
-    protected $status = self::STATUS_SUCCESS;
-    protected $command;
-    protected $args;
-    protected $msg;
+    protected StatusEnum $status = StatusEnum::UN_INIT;
+    protected string $command;
+    protected mixed $args = null;
+    protected string|null $msg = null;
 
-    const STATUS_UNIX_CONNECT_ERROR = -1;
-    const STATUS_PACKAGE_ERROR = -2;
-    const STATUS_COMMAND_NOT_EXIST = -3;
-    const STATUS_COMMAND_ERROR = -4;
+    protected Socket|null $clientSocket  = null;
 
-    const STATUS_SUCCESS = 1;
 
-    /**
-     * @return mixed
-     */
-    public function getStatus()
+    public function getStatus(): StatusEnum
     {
         return $this->status;
     }
 
-    /**
-     * @param mixed $status
-     */
-    public function setStatus($status): void
+
+    public function setStatus(StatusEnum $status): void
     {
         $this->status = $status;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getCommand()
+
+    public function getCommand():string
     {
         return $this->command;
     }
 
-    /**
-     * @param mixed $command
-     */
-    public function setCommand($command): void
+
+    public function setCommand(string $command): void
     {
         $this->command = $command;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getArgs()
+    public function getArgs():mixed
     {
         return $this->args;
     }
 
-    /**
-     * @param mixed $args
-     */
-    public function setArgs($args): void
+
+    public function setArgs(mixed $args): void
     {
         $this->args = $args;
     }
 
-    /**
-     * @return mixed
-     */
-    public function getMsg()
+
+    public function getMsg():string|null
     {
         return $this->msg;
     }
 
-    /**
-     * @param mixed $msg
-     */
-    public function setMsg($msg): void
+
+    public function setMsg(string|null $msg): void
     {
         $this->msg = $msg;
+    }
+
+    public function getClientSocket():Socket|null
+    {
+        return $this->clientSocket;
+    }
+
+    public function setClientSocket(Socket $clientSocket): void{
+        $this->clientSocket = $clientSocket;
     }
 }
