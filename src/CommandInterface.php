@@ -9,5 +9,5 @@ use Swoole\Coroutine\Socket;
 interface CommandInterface
 {
     public function commandName():string;
-    public function exec(Package $package,Package $responsePackage);
+    public function exec(Package $request,Package $responsePackage);
 }
