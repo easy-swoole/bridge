@@ -10,14 +10,6 @@ use PHPUnit\Framework\TestCase;
 
 final class PackageTest extends TestCase
 {
-    public function testPayloadAndHeaderFitPacketLimit(): void
-    {
-        self::assertSame(
-            Package::MAX_PACKET_LENGTH,
-            Package::MAX_PAYLOAD_LENGTH + Package::PACKET_HEADER_LENGTH
-        );
-    }
-
     public function testDefaultsAreSafeToRead(): void
     {
         $package = new Package();

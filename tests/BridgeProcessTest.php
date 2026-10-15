@@ -52,7 +52,7 @@ final class BridgeProcessTest extends TestCase
     {
         $response = new Package();
         $response->setStatus(StatusEnum::SUCCESS);
-        $response->setArgs(str_repeat('x', Package::MAX_PAYLOAD_LENGTH));
+        $response->setArgs(str_repeat('x', 1024 * 1024));
 
         $result = $this->serializeAndRestore($response);
 

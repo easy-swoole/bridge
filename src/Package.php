@@ -8,10 +8,6 @@ use Swoole\Coroutine\Socket;
 
 class Package
 {
-    public const PACKET_HEADER_LENGTH = 4;
-    public const MAX_PACKET_LENGTH = 1024 * 1024;
-    public const MAX_PAYLOAD_LENGTH = self::MAX_PACKET_LENGTH - self::PACKET_HEADER_LENGTH;
-
     protected StatusEnum $status = StatusEnum::UN_INIT;
     protected string $command = '';
     protected mixed $args = null;

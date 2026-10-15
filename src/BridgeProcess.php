@@ -12,11 +12,13 @@ class BridgeProcess extends AbstractUnixProcess
 {
     private Container $container;
     private mixed $onException;
+    private int $maxPacketLength = 1024 * 1024;
 
-    function run($arg)
+    function run($arg): void
     {
         $this->container = $arg['container'];
         $this->onException = $arg['onException'];
+        $this->maxPacketLength = $arg['maxPacketLength'];
         parent::run($arg);
     }
 
@@ -89,7 +91,7 @@ class BridgeProcess extends AbstractUnixProcess
                 'serialize response package error'
             );
         }
-        if (strlen($payload) > Package::MAX_PAYLOAD_LENGTH) {
+        if (strlen($payload) > $this->maxPayloadLength()) {
             return $this->serializeErrorPackage(StatusEnum::RESPONSE_TOO_LARGE, 'response package is too large');
         }
         return $payload;
@@ -111,7 +113,7 @@ class BridgeProcess extends AbstractUnixProcess
         }
 
         $length = Protocol::packDataLength($header);
-        if ($length <= 0 || $length > Package::MAX_PAYLOAD_LENGTH) {
+        if ($length <= 0 || $length > $this->maxPayloadLength()) {
             return null;
         }
 
@@ -123,7 +125,12 @@ class BridgeProcess extends AbstractUnixProcess
         return $data;
     }
 
-    protected function onException(\Throwable $throwable, ...$args)
+    private function maxPayloadLength(): int
+    {
+        return $this->maxPacketLength - 4;
+    }
+
+    protected function onException(\Throwable $throwable, ...$args): void
     {
         if($this->onException !== null){
             call_user_func($this->onException, $throwable);

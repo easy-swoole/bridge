@@ -5,8 +5,8 @@ namespace EasySwoole\Bridge;
 
 
 use EasySwoole\Component\Process\Socket\UnixProcessConfig;
-use EasySwoole\Socket\Tools\Client;
 use EasySwoole\Socket\Tools\Protocol;
+use Swoole\Coroutine\Client;
 use Swoole\Server;
 
 class Bridge
@@ -15,18 +15,14 @@ class Bridge
 
     private string $socketFile;
     private Container $container;
+    private Config $config;
     private mixed $onException = null;
-    private string $serverName;
     private bool $hasAttach = false;
 
-    function __construct(Container|null $container = null, string $serverName = 'EasySwoole')
+    function __construct(Container|null $container = null)
     {
-        $serverName = trim($serverName);
-        if ($serverName === '' || str_contains($serverName, "\0") || str_contains($serverName, DIRECTORY_SEPARATOR)) {
-            throw new \InvalidArgumentException('serverName must be a non-empty file-name-safe string');
-        }
         $this->container = $container ?? new Container();
-        $this->serverName = $serverName;
+        $this->config = new Config();
     }
 
 
@@ -44,6 +40,11 @@ class Bridge
         return $this->container;
     }
 
+    function getConfig(): Config
+    {
+        return $this->config;
+    }
+
     function attachServer(Server $server): void
     {
         if($this->hasAttach){
@@ -51,15 +52,18 @@ class Bridge
         }
         $config = new UnixProcessConfig();
         $config->setSocketFile($this->getSocketFile());
-        $config->setProcessName("{$this->serverName}.Bridge");
-        $config->setProcessGroup("{$this->serverName}.Bridge");
+        $serverName = $this->config->getServerName();
+        $config->setProcessName("{$serverName}.Bridge");
+        $config->setProcessGroup("{$serverName}.Bridge");
         $config->setArg([
             'container'=>$this->container,
-            'onException'=>$this->onException
+            'onException'=>$this->onException,
+            'maxPacketLength'=>$this->config->getMaxPacketLength(),
         ]);
         $p = new BridgeProcess($config);
         $server->addProcess($p->getProcess());
         $this->hasAttach = true;
+        $this->config->lock();
     }
 
     function send(Package $package,float $timeout = 3.0): Package
@@ -74,7 +78,7 @@ class Bridge
         } catch (\Throwable) {
             return $this->errorPackage(StatusEnum::REQUEST_SERIALIZE_ERROR, 'serialize request package error');
         }
-        if (strlen($payload) > Package::MAX_PAYLOAD_LENGTH) {
+        if (strlen($payload) > $this->maxPayloadLength()) {
             return $this->errorPackage(StatusEnum::REQUEST_TOO_LARGE, 'request package is too large');
         }
 
@@ -82,14 +86,21 @@ class Bridge
         if ($remaining === null) {
             return $this->errorPackage(StatusEnum::CONNECT_ERROR, 'connect to server timeout');
         }
-        $client = new Client($this->getSocketFile(), null, $remaining);
+        $client = new Client(SWOOLE_UNIX_STREAM);
+        $client->set([
+            'open_length_check' => true,
+            'package_length_type' => 'N',
+            'package_length_offset' => 0,
+            'package_body_offset' => 4,
+            'package_max_length' => $this->config->getMaxPacketLength(),
+        ]);
         try {
-            if(!$client->client()->isConnected()){
+            if (!$client->connect($this->getSocketFile(), 0, $remaining)) {
                 return $this->errorPackage(StatusEnum::CONNECT_ERROR, 'connect to server fail');
             }
 
             $packet = Protocol::pack($payload);
-            $socket = $client->client()->exportSocket();
+            $socket = $client->exportSocket();
             $remaining = $this->remainingTime($deadline);
             if ($remaining === null) {
                 return $this->errorPackage(StatusEnum::SEND_ERROR, 'send package to server timeout');
@@ -111,7 +122,7 @@ class Bridge
             return $this->errorPackage(StatusEnum::RECEIVE_ERROR, 'receive package from server error');
         }
 
-        return $this->deserializeResponse($ret, $deadline);
+        return $this->deserializeResponse(Protocol::unpack($ret), $deadline);
     }
 
     private function deserializeResponse(string $payload, float $deadline): Package
@@ -147,6 +158,11 @@ class Bridge
         return $remaining > 0 ? $remaining : null;
     }
 
+    private function maxPayloadLength(): int
+    {
+        return $this->config->getMaxPacketLength() - 4;
+    }
+
     function call(string $command,$arg = null,float $timeout = 3.0):Package
     {
         $package = new Package();
@@ -161,9 +177,9 @@ class Bridge
         if(isset($this->socketFile)) {
             return $this->socketFile;
         }
-        $this->socketFile = sys_get_temp_dir()."/{$this->serverName}.bridge.sock";
-        $this->validateSocketFile($this->socketFile);
-        return $this->socketFile;
+        $socketFile = sys_get_temp_dir()."/{$this->config->getServerName()}.bridge.sock";
+        $this->validateSocketFile($socketFile);
+        return $socketFile;
     }
 
 

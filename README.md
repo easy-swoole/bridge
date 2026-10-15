@@ -66,7 +66,8 @@ $server->on('Receive', static function (
     // 处理主服务自己的 TCP 请求。
 });
 
-$bridge = new Bridge(serverName: 'OrderService');
+$bridge = new Bridge();
+$bridge->getConfig()->setServerName('OrderService');
 $bridge->getCommandContainer()->set(new PingCommand());
 $bridge->setOnException(static function (Throwable $throwable): void {
     error_log((string) $throwable);
@@ -88,7 +89,16 @@ $server->start();
 $bridge->setSocketFile('/var/run/my-app/order.bridge.sock');
 ```
 
-`attachServer()` 执行后，异常回调和 socket 路径不可再修改。服务启动后，命令容器已存在于独立子进程内；运行期间修改主进程中的容器不会同步到 Bridge 子进程。
+数据包上限也可以在构造时调整。通信双方必须使用相同的上限：
+
+```php
+$bridge = new Bridge();
+$bridge->getConfig()
+    ->setServerName('OrderService')
+    ->setMaxPacketLength(2 * 1024 * 1024);
+```
+
+`attachServer()` 执行后，Config、异常回调和 socket 路径不可再修改。服务启动后，命令容器已存在于独立子进程内；运行期间修改主进程中的容器不会同步到 Bridge 子进程。
 
 ## 客户端调用
 
@@ -102,7 +112,8 @@ use EasySwoole\Bridge\StatusEnum;
 use Swoole\Coroutine;
 
 Coroutine\run(static function (): void {
-    $bridge = new Bridge(serverName: 'OrderService');
+    $bridge = new Bridge();
+    $bridge->getConfig()->setServerName('OrderService');
     $result = $bridge->call('ping', ['id' => 42], timeout: 3.0);
 
     if ($result->getStatus() !== StatusEnum::SUCCESS) {
@@ -160,9 +171,9 @@ PHP 无法安全中断正在执行的同步 `__unserialize()`。Bridge 会在反
 
 ## 协议限制
 
-- 完整数据包最大为 1 MiB。
+- 完整数据包默认最大为 1 MiB，可通过 `$bridge->getConfig()->setMaxPacketLength()` 调整。
 - 长度头固定为 4 字节。
-- 最大序列化正文为 `1 MiB - 4 字节`。
+- 最大序列化正文为 `maxPacketLength - 4 字节`。
 - Unix Socket 路径最长为 103 字节。
 - 请求参数和响应数据必须能够被 PHP `serialize()` 正确处理。
 - socket 路径的唯一性、权限和相对路径解析由调用方负责。

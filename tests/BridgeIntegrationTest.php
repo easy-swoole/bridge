@@ -19,6 +19,7 @@ final class BridgeIntegrationTest extends TestCase
 {
     private string $socketFile;
     private ?int $pid = null;
+    private int $maxPacketLength = 1024 * 1024;
 
     protected function setUp(): void
     {
@@ -110,8 +111,34 @@ final class BridgeIntegrationTest extends TestCase
         self::assertLessThan(0.15, $elapsed);
     }
 
-    private function startServer(CommandInterface $command, ?callable $onException = null): void
+    public function testCustomPacketLimitSupportsPayloadLargerThanDefault(): void
     {
+        $body = str_repeat('x', 1_200_000);
+        $this->startServer(new class implements CommandInterface {
+            public function commandName(): string
+            {
+                return 'large-echo';
+            }
+
+            public function exec(Package $request, Package $responsePackage): void
+            {
+                $responsePackage->setArgs($request->getArgs());
+            }
+        }, null, 2 * 1024 * 1024);
+
+        $result = $this->call('large-echo', $body, 2.0);
+
+        self::assertSame(StatusEnum::SUCCESS, $result->getStatus());
+        self::assertSame(strlen($body), strlen($result->getArgs()));
+    }
+
+    private function startServer(
+        CommandInterface $command,
+        ?callable $onException = null,
+        int $maxPacketLength = 1024 * 1024
+    ): void
+    {
+        $this->maxPacketLength = $maxPacketLength;
         $container = new Container();
         $container->set($command);
 
@@ -122,6 +149,7 @@ final class BridgeIntegrationTest extends TestCase
         $config->setArg([
             'container' => $container,
             'onException' => $onException,
+            'maxPacketLength' => $maxPacketLength,
         ]);
 
         $process = new BridgeProcess($config);
@@ -142,6 +170,7 @@ final class BridgeIntegrationTest extends TestCase
         $result = null;
         Coroutine\run(function () use ($command, $args, $timeout, &$result): void {
             $bridge = (new Bridge())->setSocketFile($this->socketFile);
+            $bridge->getConfig()->setMaxPacketLength($this->maxPacketLength);
             $result = $bridge->call($command, $args, $timeout);
         });
 

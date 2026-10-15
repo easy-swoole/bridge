@@ -27,12 +27,13 @@ final class BridgeTest extends TestCase
 
     public function testCustomServerNameDeterminesSocketFile(): void
     {
-        $bridge = new class(null, '  Worker  ') extends Bridge {
+        $bridge = new class extends Bridge {
             public function socketFile(): string
             {
                 return $this->getSocketFile();
             }
         };
+        $bridge->getConfig()->setServerName('  Worker  ');
 
         self::assertSame(sys_get_temp_dir() . '/Worker.bridge.sock', $bridge->socketFile());
     }
@@ -42,14 +43,22 @@ final class BridgeTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('serverName must be a non-empty file-name-safe string');
 
-        new Bridge(null, '   ');
+        (new Bridge())->getConfig()->setServerName('   ');
     }
 
     public function testServerNameMustNotContainDirectorySeparator(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        new Bridge(null, 'group/worker');
+        (new Bridge())->getConfig()->setServerName('group/worker');
+    }
+
+    public function testMaximumPacketLengthMustExceedHeaderLength(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('maxPacketLength must be greater than the packet header length');
+
+        (new Bridge())->getConfig()->setMaxPacketLength(4);
     }
 
     public function testSocketFileMustNotBeEmpty(): void
@@ -77,12 +86,13 @@ final class BridgeTest extends TestCase
 
     public function testGeneratedSocketFileMustFitUnixSocketPathLimit(): void
     {
-        $bridge = new class(null, str_repeat('x', 100)) extends Bridge {
+        $bridge = new class extends Bridge {
             public function socketFile(): string
             {
                 return $this->getSocketFile();
             }
         };
+        $bridge->getConfig()->setServerName(str_repeat('x', 100));
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('socketFile must not exceed 103 bytes');
@@ -129,7 +139,7 @@ final class BridgeTest extends TestCase
     {
         $bridge = (new Bridge())->setSocketFile('/tmp/bridge-test.sock');
         $package = new Package();
-        $package->setArgs(str_repeat('x', Package::MAX_PAYLOAD_LENGTH));
+        $package->setArgs(str_repeat('x', 1024 * 1024));
 
         $result = $bridge->send($package);
 
