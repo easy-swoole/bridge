@@ -22,27 +22,37 @@ class BridgeProcess extends AbstractUnixProcess
 
     function onAccept(Socket $socket)
     {
-        $data = Protocol::socketReader($socket, 3);
+        $data = $this->readPackage($socket);
         if ($data === null) {
             $responsePackage = new Package();
-            $responsePackage->setStatus(StatusEnum::PACKAGE_ERROR);
+            $responsePackage->setStatus(StatusEnum::INVALID_PACKAGE);
             $responsePackage->setMsg('receive package from client error');
-            Protocol::socketWriter($socket, serialize($responsePackage));
-            $socket->close();
+            $this->writeResponse($socket, $responsePackage);
             return null;
         }
         /**
          * @var $request Package
          */
-        $request = unserialize($data);
+        try {
+            $request = @unserialize($data);
+        } catch (\Throwable) {
+            $request = null;
+        }
+
+        if (!$request instanceof Package || trim($request->getCommand()) === '') {
+            $responsePackage = new Package();
+            $responsePackage->setStatus(StatusEnum::INVALID_PACKAGE);
+            $responsePackage->setMsg('invalid package or empty command');
+            $this->writeResponse($socket, $responsePackage);
+            return null;
+        }
 
         $command = $this->container->get($request->getCommand());
         if (!$command instanceof CommandInterface) {
             $responsePackage = new Package();
             $responsePackage->setStatus(StatusEnum::COMMAND_NOT_EXIST);
             $responsePackage->setMsg("command {$request->getCommand()} not exist");
-            Protocol::socketWriter($socket, serialize($responsePackage));
-            $socket->close();
+            $this->writeResponse($socket, $responsePackage);
             return null;
         }
         $responsePackage = new Package();
@@ -54,17 +64,69 @@ class BridgeProcess extends AbstractUnixProcess
         }catch (\Throwable $throwable){
             $responsePackage->setStatus(StatusEnum::COMMAND_EXEC_ERROR);
             $responsePackage->setMsg($throwable->getMessage());
-            $this->onException($throwable);
+            throw $throwable;
         } finally {
-            Protocol::socketWriter($socket,serialize($responsePackage));
+            $this->writeResponse($socket, $responsePackage);
+        }
+    }
+
+    private function writeResponse(Socket $socket, Package $responsePackage): void
+    {
+        try {
+            Protocol::socketWriter($socket, $this->serializeResponse($responsePackage));
+        } finally {
             $socket->close();
         }
     }
 
+    private function serializeResponse(Package $responsePackage): string
+    {
+        try {
+            $payload = serialize($responsePackage);
+        } catch (\Throwable) {
+            return $this->serializeErrorPackage(
+                StatusEnum::RESPONSE_SERIALIZE_ERROR,
+                'serialize response package error'
+            );
+        }
+        if (strlen($payload) > Package::MAX_PAYLOAD_LENGTH) {
+            return $this->serializeErrorPackage(StatusEnum::RESPONSE_TOO_LARGE, 'response package is too large');
+        }
+        return $payload;
+    }
+
+    private function serializeErrorPackage(StatusEnum $status, string $message): string
+    {
+        $fallback = new Package();
+        $fallback->setStatus($status);
+        $fallback->setMsg($message);
+        return serialize($fallback);
+    }
+
+    private function readPackage(Socket $socket, float $timeout = 3.0): ?string
+    {
+        $header = $socket->recvAll(4, $timeout);
+        if (!is_string($header) || strlen($header) !== 4) {
+            return null;
+        }
+
+        $length = Protocol::packDataLength($header);
+        if ($length <= 0 || $length > Package::MAX_PAYLOAD_LENGTH) {
+            return null;
+        }
+
+        $data = $socket->recvAll($length, $timeout);
+        if (!is_string($data) || strlen($data) !== $length) {
+            return null;
+        }
+
+        return $data;
+    }
+
     protected function onException(\Throwable $throwable, ...$args)
     {
-        if($this->onException){
-            call_user_func($this->onException,$throwable);
+        if($this->onException !== null){
+            call_user_func($this->onException, $throwable);
         }else{
             throw $throwable;
         }

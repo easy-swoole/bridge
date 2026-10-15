@@ -1,0 +1,20 @@
+# Composer dependencies and library-local lock file
+/vendor/
+/composer.lock
+
+# PHPUnit runtime files
+/.phpunit.cache/
+/.phpunit.result.cache
+/coverage/
+/clover.xml
+
+# IDE and editor settings
+/.idea/
+/.vscode/
+*.swp
+*.swo
+*~
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db

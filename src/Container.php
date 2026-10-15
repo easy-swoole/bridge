@@ -10,14 +10,18 @@ class Container
 
     public function set(CommandInterface $command,bool $cover = false):void
     {
-        if(!isset($this->container[strtolower($command->commandName())]) || $cover){
-            $this->container[strtolower($command->commandName())] = $command;
+        $name = strtolower(trim($command->commandName()));
+        if ($name === '') {
+            throw new \InvalidArgumentException('command name must not be empty');
+        }
+        if(!isset($this->container[$name]) || $cover){
+            $this->container[$name] = $command;
         }
     }
 
-    function get($key): CommandInterface|null
+    function get(string $key): CommandInterface|null
     {
-        $key = strtolower($key);
+        $key = strtolower(trim($key));
         if (isset($this->container[$key])) {
             return $this->container[$key];
         } else {
